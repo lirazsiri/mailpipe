@@ -1,8 +1,10 @@
 #!/usr/bin/python
 import sys
-import getopt
 import email
+import getopt
+
 import re
+from docutils import core, utils
 
 QUOTED_FIRSTLINE_RE = '\| Your subscription'
 
@@ -16,52 +18,63 @@ def usage(e=None):
     print >> sys.stderr, "syntax: cat mail.eml | %s" % sys.argv[0]
     sys.exit(1)
 
-def get_sender_address(msg):
-    sender_address = msg['from']
-    m = re.search(r'<(.*)>', sender_address)
-    if m:
-        sender_address = m.group(1)
+def rst2html(input_string, initial_header_level=2):
+    overrides = {'initial_header_level': initial_header_level,
+                 'halt_level': 2 }
+    try:
+        parts = core.publish_parts(source=input_string, writer_name='html',
+                                   settings_overrides=overrides) 
+    except utils.SystemMessage, e:
+        raise Error(str(e))
 
-    return sender_address
-
-def get_title(msg):
-    title = msg['subject']
-
-    m = re.match(r'^(.*)[\s\(]Re:', title, re.IGNORECASE | re.DOTALL)
-    if m:
-        title = m.group(1).strip()
-
-    return title
-    
-def split_body(body):
-    """split body into reply and original quoted text"""
-    def find_line(lines, pattern):
-        pattern = re.compile(pattern)
-        for i, line in enumerate(lines):
-            if pattern.match(line):
-                return i
-
-        raise Error("can't find line pattern (%s)" % pattern)
-
-    lines = body.splitlines()
-
-    linenum = find_line(lines, '^.\s*' + QUOTED_FIRSTLINE_RE)
-    def rejoin(lines):
-        return "\n".join(lines).strip()
-
-    return rejoin(lines[:linenum-1]), rejoin(lines[linenum-1:])
-
-def get_post_path(quoted):
-    # we expect the post path to be the first thing that looks like an URL in
-    # the quoted message text
-
-    m = re.search(r'https?://.*?/(.*)\s', quoted) 
-    if not m:
-        raise Error("couldn't URL of post being replied to in the quoted text")
-
-    return m.group(1)
+    return parts['body']
 
 def parse_mail(s):
+    def get_sender_address(msg):
+        sender_address = msg['from']
+        m = re.search(r'<(.*)>', sender_address)
+        if m:
+            sender_address = m.group(1)
+
+        return sender_address
+
+    def get_title(msg):
+        title = msg['subject']
+
+        m = re.match(r'^(.*)[\s\(]Re:', title, re.IGNORECASE | re.DOTALL)
+        if m:
+            title = m.group(1).strip()
+
+        return title
+        
+    def split_body(body):
+        """split body into reply and original quoted text"""
+        def find_line(lines, pattern):
+            pattern = re.compile(pattern)
+            for i, line in enumerate(lines):
+                if pattern.match(line):
+                    return i
+
+            raise Error("can't find line pattern (%s)" % pattern)
+
+        lines = body.splitlines()
+
+        linenum = find_line(lines, '^.\s*' + QUOTED_FIRSTLINE_RE)
+        def rejoin(lines):
+            return "\n".join(lines).strip()
+
+        return rejoin(lines[:linenum-1]), rejoin(lines[linenum-1:])
+
+    def get_post_path(quoted):
+        # we expect the post path to be the first thing that looks like an URL in
+        # the quoted message text
+
+        m = re.search(r'https?://.*?/(.*)\s', quoted) 
+        if not m:
+            raise Error("couldn't URL of post being replied to in the quoted text")
+
+        return m.group(1)
+
     msg = email.message_from_string(s)
     
     sender_address = get_sender_address(msg)
@@ -84,7 +97,7 @@ def main():
     post_path, sender_address, title, reply = parse_mail(sys.stdin.read())
     print `(post_path, sender_address)`
     print title
-    print reply
+    print rst2html(reply)
 
 if __name__ == "__main__":
     main()
