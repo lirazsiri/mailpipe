@@ -61,6 +61,16 @@ def get_post_path(quoted):
 
     return m.group(1)
 
+def parse_mail(s):
+    msg = email.message_from_string(s)
+    
+    sender_address = get_sender_address(msg)
+    title = get_title(msg)
+    reply, quoted = split_body(msg.get_payload())
+    post_path = get_post_path(quoted)
+
+    return post_path, sender_address, title, reply
+
 def main():
     try:
         opts, args = getopt.gnu_getopt(sys.argv[1:], 'h')
@@ -71,13 +81,9 @@ def main():
         if opt == '-h':
             usage()
 
-    msg = email.message_from_string(sys.stdin.read())
-
-    sender_address = get_sender_address(msg)
-    reply, quoted = split_body(msg.get_payload())
-    post_path = get_post_path(quoted)
-
+    post_path, sender_address, title, reply = parse_mail(sys.stdin.read())
     print `(post_path, sender_address)`
+    print title
     print reply
 
 if __name__ == "__main__":
