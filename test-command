@@ -1,0 +1,15 @@
+#!/bin/bash
+
+if [[ $# < 3 ]]; then
+    echo "Usage: (echo title; cat body) | $0 post_path sender"
+    exit 1
+fi
+
+echo post_path=$1
+echo sender=$2
+
+read TITLE
+echo TITLE=$TITLE
+echo === BODY STARTS
+cat
+echo === BODY ENDS
