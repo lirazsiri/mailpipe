@@ -79,13 +79,10 @@ def split_body(body, quoted_firstline_re):
         return "\n".join(lines).strip()
     return rejoin(lines[:linenum-1]), rejoin(lines[linenum-1:])
 
-def get_post_path(quoted, quoted_actiontoken_re):
-    # we expect the post path to be the first thing that looks like an URL in
-    # the quoted message text
-
+def get_action_token(quoted, quoted_actiontoken_re):
     m = re.search(quoted_actiontoken_re, quoted) 
     if not m:
-        raise Error("couldn't URL of post being replied to in the quoted text")
+        raise Error("couldn't match regexp for quoted action token /%s/" % quoted_actiontoken_re)
 
     return m.group(1)
 
@@ -147,14 +144,17 @@ def main():
     title = get_title(msg)
 
     reply, quoted = split_body(msg.get_payload(), opt_quoted_firstline_re)
-    post_path = get_post_path(quoted, opt_quoted_actiontoken_re)
+    action_token = get_action_token(quoted, opt_quoted_actiontoken_re)
 
     if opt_bodyfilter_rst2html:
         reply = rst2html(reply)
 
-    print `(post_path, sender_address)`
-    print title
-    print reply
+    if opt_debug:
+        print "ACTION COMMAND: %s %s %s" % (action_command, action_token, sender_address)
+
+        print "TITLE: " + title
+        print
+        print reply
 
 if __name__ == "__main__":
     main()
