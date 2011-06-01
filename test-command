@@ -1,11 +1,11 @@
 #!/bin/bash
 
 if [[ $# < 2 ]]; then
-    echo "Usage: (echo title; cat body) | $0 post_path sender"
+    echo "Usage: (echo title; cat body) | $0 action_token sender"
     exit 1
 fi
 
-echo post_path=$1
+echo action_token=$1
 echo sender=$2
 
 echo stderr 1>&2 # prints stderr to stderr
@@ -15,3 +15,5 @@ echo TITLE=$TITLE
 echo === BODY STARTS
 cat
 echo === BODY ENDS
+
+exit 1
