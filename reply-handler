@@ -4,15 +4,18 @@ Invoke an action from a parsed mail reply. Useful for handling a reply
 to an automatic notification from a website (for example).
 
 Options:
-    --debug                           Debug mail parsing
-    --mail-error                      Mail action errors back to sender
-    --bodyfilter-rst2html             Pass body through a rst2html filter
+    --debug                            Debug mail parsing
+    --mail-error                       Mail action errors back to sender
+    --bodyfilter-rst2html              Pass body through a rst2html filter
 
-    --quoted-firstline-re='REGEXP'    Regexp for first line of quoted text
-                                      Default: $DEFAULT_QUOTED_FIRSTLINE_RE
+    --quoted-firstline-re='REGEXP'     Regexp for first line of quoted text
+                                       Default: $DEFAULT_QUOTED_FIRSTLINE_RE
 
-    --quoted-actiontoken-re='REGEXP'  Regexp for action token in qouted text
-                                      Default: $DEFAULT_QUOTED_ACTIONTOKEN_RE
+    --quoted-actiontoken-re='REGEXP'   Regexp for action token in qouted text
+                                       Default: $DEFAULT_QUOTED_ACTIONTOKEN_RE
+
+    --auth-sender=SECRET | PATH        Authenticate sender with secret
+                                       Accepts a string value or a file path
 
 Action API:
     
@@ -20,6 +23,8 @@ Action API:
 
 """
 import os
+from os.path import *
+
 import sys
 import getopt
 
@@ -33,6 +38,8 @@ from subprocess import Popen, PIPE
 
 import email
 from email.mime.text import MIMEText
+
+import sha
 
 from StringIO import StringIO
 import traceback
@@ -119,6 +126,21 @@ def sendmail(sender, recipient, subject, body):
 
     Popen("sendmail -t", shell=True, stdin=PIPE).communicate(str(email))
 
+class AuthSender:
+    def __init__(self, secret):
+        self.secret = secret
+
+    def __call__(self, msg, sender_address, action_token):
+        m = re.match(r'(.*?)\s+<', msg['to'])
+        if not m:
+            raise Error("expected auth token in the email's To: field")
+        tok1 = m.group(1)
+        print `self.secret, sender_address, action_token`
+        tok2 = sha.sha(":".join([self.secret, sender_address, action_token])).hexdigest()[:8]
+
+        if tok1 != tok2:
+            raise Error("invalid authentication token in To field (%s)" % tok1)
+
 def main():
     opt_debug = False
     opt_mailerror = False
@@ -126,9 +148,12 @@ def main():
     opt_quoted_firstline_re = DEFAULT_QUOTED_FIRSTLINE_RE
     opt_quoted_actiontoken_re = DEFAULT_QUOTED_ACTIONTOKEN_RE
 
+    auth_sender = None
+
     try:
         opts, args = getopt.gnu_getopt(sys.argv[1:], 'h', 
-                                       [ 'quoted-firstline-re=',
+                                       [ 'auth-sender=',
+                                         'quoted-firstline-re=',
                                          'quoted-actiontoken-re=',
                                          'bodyfilter-rst2html',
                                          'mail-error',
@@ -165,6 +190,12 @@ def main():
         if opt == '--quoted-actiontoken-re':
             opt_quoted_actiontoken_re = val
 
+        if opt == '--auth-sender':
+            if isfile(val):
+                val = file(val).readline().strip()
+
+            auth_sender = AuthSender(val)
+
     msg = email.message_from_string(sys.stdin.read())
     sender_address = get_sender_address(msg)
 
@@ -173,6 +204,9 @@ def main():
     try:
         reply, quoted = split_body(msg.get_payload(), opt_quoted_firstline_re)
         action_token = get_action_token(quoted, opt_quoted_actiontoken_re)
+
+        if auth_sender:
+            auth_sender(msg, sender_address, action_token)
 
         if opt_bodyfilter_rst2html:
             reply = rst2html(reply)
