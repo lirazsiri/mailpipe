@@ -18,6 +18,7 @@ Action API:
     (echo title; cat body) | action action_path sender_email
 
 """
+import os
 import sys
 import email
 import getopt
@@ -26,8 +27,11 @@ import re
 from docutils import core, utils
 import string
 
+from commands import mkarg
+from popen2 import Popen4
+
 DEFAULT_QUOTED_FIRSTLINE_RE = r'\| Your subscription'
-DEFAULT_QUOTED_ACTIONTOKEN_RE = r'https?://.*?/(.*)\s'
+DEFAULT_QUOTED_ACTIONTOKEN_RE = r'https?://\S*?/([_\w\d\#\/\-]+)\s'
 
 class Error(Exception):
     pass
@@ -49,7 +53,10 @@ def get_sender_address(msg):
     if m:
         sender_address = m.group(1)
 
-    return sender_address
+    def filter_legal(s):
+        return re.sub(r'[^\w\d\.\-@+_]', '', s)
+
+    return filter_legal(sender_address)
 
 def get_title(msg):
     title = msg['subject']
@@ -149,12 +156,27 @@ def main():
     if opt_bodyfilter_rst2html:
         reply = rst2html(reply)
 
+    command = action_command + " %s %s" % (mkarg(action_token), mkarg(sender_address))
     if opt_debug:
-        print "ACTION COMMAND: %s %s %s" % (action_command, action_token, sender_address)
-
+        print "COMMAND: " + command
         print "TITLE: " + title
         print
         print reply
+        return
+
+    child = Popen4(command)
+    print >> child.tochild, title
+    print >> child.tochild, reply
+    child.tochild.close()
+
+    command_output = child.fromchild.read()
+    error = child.wait()
+
+    if error != 0:
+        raise Error("non-zero exitcode (%s) for command: %s\n\n%s" % 
+                    (os.WEXITSTATUS(error), command, command_output))
+
+
 
 if __name__ == "__main__":
     main()
