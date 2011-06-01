@@ -5,6 +5,7 @@ to an automatic notification from a website (for example).
 
 Options:
     --debug                           Debug mail parsing
+    --mail-error                      Mail action errors back to sender
     --bodyfilter-rst2html             Pass body through a rst2html filter
 
     --quoted-firstline-re='REGEXP'    Regexp for first line of quoted text
@@ -20,7 +21,6 @@ Action API:
 """
 import os
 import sys
-import email
 import getopt
 
 import re
@@ -29,6 +29,13 @@ import string
 
 from commands import mkarg
 from popen2 import Popen4
+from subprocess import Popen, PIPE
+
+import email
+from email.mime.text import MIMEText
+
+from StringIO import StringIO
+import traceback
 
 DEFAULT_QUOTED_FIRSTLINE_RE = r'\| Your subscription'
 DEFAULT_QUOTED_ACTIONTOKEN_RE = r'https?://\S*?/([_\w\d\#\/\-]+)\s'
@@ -104,8 +111,17 @@ def usage(e=None):
 
     sys.exit(1)
 
+def sendmail(sender, recipient, subject, body):
+    email = MIMEText(body)
+    email['From'] = sender
+    email['To'] = recipient
+    email['Subject'] = subject
+
+    Popen("sendmail -t", shell=True, stdin=PIPE).communicate(str(email))
+
 def main():
     opt_debug = False
+    opt_mailerror = False
     opt_bodyfilter_rst2html = False
     opt_quoted_firstline_re = DEFAULT_QUOTED_FIRSTLINE_RE
     opt_quoted_actiontoken_re = DEFAULT_QUOTED_ACTIONTOKEN_RE
@@ -115,6 +131,7 @@ def main():
                                        [ 'quoted-firstline-re=',
                                          'quoted-actiontoken-re=',
                                          'bodyfilter-rst2html',
+                                         'mail-error',
                                          'debug'
                                        ])
                                        
@@ -136,6 +153,9 @@ def main():
         if opt == '--debug':
             opt_debug = True
 
+        if opt == '--mail-error':
+            opt_mailerror = True
+
         if opt == '--bodyfilter-rst2html':
             opt_bodyfilter_rst2html = True
 
@@ -146,37 +166,47 @@ def main():
             opt_quoted_actiontoken_re = val
 
     msg = email.message_from_string(sys.stdin.read())
-    
     sender_address = get_sender_address(msg)
+
     title = get_title(msg)
 
-    reply, quoted = split_body(msg.get_payload(), opt_quoted_firstline_re)
-    action_token = get_action_token(quoted, opt_quoted_actiontoken_re)
+    try:
+        reply, quoted = split_body(msg.get_payload(), opt_quoted_firstline_re)
+        action_token = get_action_token(quoted, opt_quoted_actiontoken_re)
 
-    if opt_bodyfilter_rst2html:
-        reply = rst2html(reply)
+        if opt_bodyfilter_rst2html:
+            reply = rst2html(reply)
 
-    command = action_command + " %s %s" % (mkarg(action_token), mkarg(sender_address))
-    if opt_debug:
-        print "COMMAND: " + command
-        print "TITLE: " + title
-        print
-        print reply
-        return
+        command = action_command + " %s %s" % (mkarg(action_token), mkarg(sender_address))
+        if opt_debug:
+            print "COMMAND: " + command
+            print "TITLE: " + title
+            print
+            print reply
+            return
 
-    child = Popen4(command)
-    print >> child.tochild, title
-    print >> child.tochild, reply
-    child.tochild.close()
+        child = Popen4(command)
+        print >> child.tochild, title
+        print >> child.tochild, reply
+        child.tochild.close()
 
-    command_output = child.fromchild.read()
-    error = child.wait()
+        command_output = child.fromchild.read()
+        error = child.wait()
 
-    if error != 0:
-        raise Error("non-zero exitcode (%s) for command: %s\n\n%s" % 
-                    (os.WEXITSTATUS(error), command, command_output))
+        if error != 0:
+            raise Error("non-zero exitcode (%s) for command: %s\n\n%s" % 
+                        (os.WEXITSTATUS(error), command, command_output))
 
+    except Exception, e:
+        if not opt_mailerror:
+            raise
 
+        sio = StringIO()
+        traceback.print_exc(file=sio)
+
+        sendmail(msg['to'], msg['from'], 
+                 'Error handling reply: ' + msg['subject'],
+                 sio.getvalue())
 
 if __name__ == "__main__":
     main()
