@@ -1,19 +1,20 @@
 #!/bin/bash
 
 if [[ $# < 2 ]]; then
-    echo "Usage: (echo title; cat body) | $0 action_token sender"
+    echo "Usage: (echo title; cat body) | $0 action_token sender [ error ]"
+    exit 1
+fi
+
+if [ -n "$3" ]; then
+    echo $3 1>&2
     exit 1
 fi
 
 echo action_token=$1
 echo sender=$2
 
-echo stderr 1>&2 # prints stderr to stderr
-
 read TITLE
 echo TITLE=$TITLE
 echo === BODY STARTS
 cat
 echo === BODY ENDS
-
-exit 1
