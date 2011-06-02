@@ -232,7 +232,7 @@ class AuthSender:
         self.secret = secret
 
     def __call__(self, msg, sender_address, action_token):
-        m = re.match(r'(.*?)\s+<', msg['to'])
+        m = re.search(r'\((.*?)\)', msg['to'])
         if not m:
             raise Error("expected auth token in the email's To: field")
         tok1 = m.group(1)
