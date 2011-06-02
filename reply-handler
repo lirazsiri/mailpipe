@@ -231,6 +231,9 @@ def main():
             raise Error("non-zero exitcode (%s) for command: %s\n\n%s" % 
                         (os.WEXITSTATUS(error), command, command_output))
 
+        if command_output:
+            print command_output,
+
     except Exception, e:
         if not opt_mailerror:
             raise
