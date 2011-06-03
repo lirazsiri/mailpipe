@@ -234,7 +234,6 @@ class AuthSender:
         if not m:
             raise Error("expected auth token in the email's To: field")
         tok1 = m.group(1)
-        print `self.secret, sender_address, action_token`
         tok2 = sha.sha(":".join([self.secret, sender_address, action_token])).hexdigest()[:8]
 
         if tok1 != tok2:
