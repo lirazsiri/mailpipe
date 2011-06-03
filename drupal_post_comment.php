@@ -36,6 +36,8 @@ function post_comment($path, $user_mail, $subject, $comment) {
 		'subject' => $subject,
 		'comment' => $comment
 	);
+
+    _comment_form_submit($comment); // e.g., fix empty subject
 	comment_save($comment);
 }
 
