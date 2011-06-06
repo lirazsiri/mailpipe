@@ -19,7 +19,7 @@ Options:
 
 Action API:
     
-    (echo title; cat body) | action action_path sender_email
+    (echo title; cat body) | action action_path urlencode(sender_email)
 
 """
 import os
@@ -44,7 +44,9 @@ import sha
 from StringIO import StringIO
 import traceback
 
-DEFAULT_QUOTED_FIRSTLINE_RE = r'\| Your subscription'
+import urllib
+
+DEFAULT_QUOTED_FIRSTLINE_RE = r'\| '
 DEFAULT_QUOTED_ACTIONTOKEN_RE = r'https?://\S*?/([_\w\d\#\/\-]+)\s'
 
 class Error(Exception):
@@ -309,7 +311,7 @@ def main():
         if opt_bodyfilter_rst2html:
             reply = rst2html(reply)
 
-        command = action_command + " %s %s" % (mkarg(action_token), mkarg(sender_address))
+        command = action_command + " %s %s" % (mkarg(action_token), mkarg(urllib.quote(msg['from'])))
         if opt_debug:
             print "COMMAND: " + command
             print "TITLE: " + title
