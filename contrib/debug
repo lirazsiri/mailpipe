@@ -1,0 +1,10 @@
+#!/bin/sh
+
+echo "---" >> /tmp/debug
+echo "\$0: $0" >> /tmp/debug
+echo "\$@: $@" >> /tmp/debug
+date >> /tmp/debug
+id >> /tmp/debug
+
+echo >> /tmp/debug
+cat >> /tmp/debug
