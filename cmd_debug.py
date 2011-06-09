@@ -168,7 +168,12 @@ class Context(object):
 for attr in ('stdin', 'stdout', 'stderr'):
     def make_property(attr):
         class RawString(Context.FileProperty):
-            pass
+            @staticmethod
+            def serialize(s):
+                if not s:
+                    return None
+                return s
+
         RawString.__name__ = attr
         return RawString()
 
