@@ -31,9 +31,6 @@ def makedirs(path):
 class UNDEFINED:
     pass
 
-def property_rw(func):
-    return property(func, func)
-
 class Context(object):
     class ContextPaths:
         SUBDIRS = ['command', 'id', 'env', 'stdin', 'stdout', 'stderr', 'exitcode', 'rerun']
@@ -63,58 +60,27 @@ class Context(object):
                 print >> fh, s
                 fh.close()
 
-    @property_rw
-    def id(self, val=UNDEFINED):
+    class FileProperty(object):
+        @staticmethod
+        def serialize(val):
+            return val
 
-        def fmt(uid, gid, groups):
-            id = "%d:%d:%s" % (uid, gid, ",".join([ str(group) 
-                                                    for group in groups ]))
-            return id
+        @staticmethod
+        def unserialize(val):
+            return val
 
-        def parse(s):
-            uid, gid, groups = s.split(':')
-            groups = [ int(group) for group in groups.split(',') ]
-            return int(uid), int(gid), groups
+        def __get__(self, obj, cls):
+            return self.unserialize(obj._file_str(getattr(obj.subpath, self.fname)))
 
-        if val and val is not UNDEFINED:
-            uid, gid, groups = val
-            val = fmt(uid, gid, groups)
+        def __set__(self, obj, val):
+            obj._file_str(getattr(obj.subpath, self.fname), self.serialize(val))
 
-        retval = self._file_str(self.subpath.id, val)
-        if retval:
-            return parse(retval)
+        def __init__(self):
+            self.fname = self.__class__.__name__
 
-    @property_rw
-    def env(self, val=UNDEFINED):
-        def fmt(env):
-            sio = StringIO()
-            for var, val in env.items():
-                print >> sio, "%s=%s" % (var, val)
-
-            return sio.getvalue()
-
-        def parse(s):
-            return dict([ line.split('=', 1) for line in s.splitlines() ])
-
-        if val and val is not UNDEFINED:
-            val = fmt(val)
-
-        retval = self._file_str(self.subpath.env, val)
-        if retval:
-            return parse(retval)
-
-    @property_rw
-    def exitcode(self, val=UNDEFINED):
-        if val and val is not UNDEFINED:
-            val = str(val)
-
-        retval = self._file_str(self.subpath.exitcode, val)
-        if retval is not None:
-            return int(retval)
-
-    @property_rw
-    def command(self, val=UNDEFINED):
-        def fmt(argv):
+    class command(FileProperty):
+        @staticmethod
+        def serialize(argv):
             if not argv:
                 return ""
 
@@ -128,15 +94,49 @@ class Context(object):
 
             return argv[0] + "".join(args)
 
-        def parse(s):
+        @staticmethod
+        def unserialize(s):
             return shlex.split(s)
+    command = command()
 
-        if val and val is not UNDEFINED:
-            val = fmt(val)
+    class id(FileProperty):
+        @staticmethod
+        def serialize(val):
+            uid, gid, groups = val
+            id = "%d:%d:%s" % (uid, gid, ",".join([ str(group) 
+                                                    for group in groups ]))
+            return id
 
-        retval = self._file_str(self.subpath.command, val)
-        if retval is not None:
-            return parse(retval)
+        @staticmethod
+        def unserialize(s):
+            uid, gid, groups = s.split(':')
+            groups = [ int(group) for group in groups.split(',') ]
+            return int(uid), int(gid), groups
+    id = id()
+
+    class env(FileProperty):
+        @staticmethod
+        def serialize(env):
+            sio = StringIO()
+            for var, val in env.items():
+                print >> sio, "%s=%s" % (var, val)
+
+            return sio.getvalue()
+
+        @staticmethod
+        def unserialize(s):
+            return dict([ line.split('=', 1) for line in s.splitlines() ])
+    env = env()
+
+    class exitcode(FileProperty):
+        @staticmethod
+        def serialize(num):
+            return str(num)
+
+        @staticmethod
+        def unserialize(s):
+            return int(s)
+    exitcode = exitcode()
 
     def save(self, input=None, command=None):
         makedirs(self.path)
@@ -171,7 +171,9 @@ for attr in ('stdin', 'stdout', 'stderr'):
             return self._file_str(getattr(self.subpath, attr), val)
         method.__name__ = attr
         return method
-    setattr(Context, attr, property_rw(make_method(attr)))
+
+    method = make_method(attr)
+    setattr(Context, attr, property(method, method))
 
 def debug():
     args = sys.argv[1:]
