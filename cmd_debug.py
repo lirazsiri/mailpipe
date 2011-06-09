@@ -157,7 +157,7 @@ class Context(object):
         pass
     stderr = stderr()
 
-    def save(self, input=None, command=None):
+    def run(self, input=None, command=None):
         makedirs(self.path)
 
         try:
@@ -183,6 +183,25 @@ class Context(object):
                     return "", str(e), None
 
             self.stdout, self.stderr, self.exitcode = run(command, input)
+            sys.exit(self.exitcode)
+
+    def rerun(self, shell=False):
+        uid, gid, groups = self.id
+
+        os.setgroups(groups)
+        os.setgid(gid)
+        os.setuid(uid)
+
+        if shell:
+            shell = os.environ.get("SHELL", "/bin/bash")
+            print "# cat stdin | " + " ".join(self.command)
+            exitcode = Popen(shell, env=self.env).wait()
+        else:
+            child = Popen(self.command, env=self.env, stdin=PIPE)
+            child.communicate(self.stdin)
+            exitcode = child.returncode
+
+        sys.exit(exitcode)
 
 def debug():
     args = sys.argv[1:]
@@ -199,8 +218,8 @@ def debug():
     digest = md5.md5(`command` + input).hexdigest()
     path = os.path.join(tmpdir, digest)
 
-    state = Context(path)
-    state.save(input, command)
+    ctx = Context(path)
+    ctx.run(input, command)
 
 def rerun():
     args = sys.argv[1:]
@@ -214,6 +233,9 @@ def rerun():
 
         if opt == "--shell":
             shell = True
+
+    ctx = Context(os.getcwd())
+    ctx.rerun(shell)
 
 def main():
     if basename(sys.argv[0]) == "rerun":
