@@ -83,10 +83,14 @@ class Context(object):
             return val
 
         def __get__(self, obj, cls):
-            return self.unserialize(obj._file_str(getattr(obj.subpath, self.fname)))
+            serialized = obj._file_str(getattr(obj.subpath, self.fname))
+            if serialized is not None:
+                return self.unserialize(serialized)
 
         def __set__(self, obj, val):
-            obj._file_str(getattr(obj.subpath, self.fname), self.serialize(val))
+            if val is not None:
+                val = self.serialize(val)
+            obj._file_str(getattr(obj.subpath, self.fname), val)
 
         def __init__(self):
             self.fname = self.__class__.__name__
