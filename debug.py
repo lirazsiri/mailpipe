@@ -46,16 +46,8 @@ class UNDEFINED:
     pass
 
 class Context(object):
-    class ContextPaths:
-        SUBDIRS = ['command', 'id', 'env', 'stdin', 'stdout', 'stderr', 'exitcode', 'rerun']
-        def __init__(self, path):
-            self.path = path
-            for subdir in self.SUBDIRS:
-                setattr(self, subdir, join(path, subdir))
-
     def __init__(self, path):
         self.path = path
-        self.subpath = self.ContextPaths(path)
 
     @staticmethod
     def _file_str(path, s=UNDEFINED):
@@ -84,14 +76,14 @@ class Context(object):
             return val
 
         def __get__(self, obj, cls):
-            serialized = obj._file_str(getattr(obj.subpath, self.fname))
+            serialized = obj._file_str(join(obj.path, self.fname))
             if serialized is not None:
                 return self.unserialize(serialized)
 
         def __set__(self, obj, val):
             if val is not None:
                 val = self.serialize(val)
-            obj._file_str(getattr(obj.subpath, self.fname), val)
+            obj._file_str(join(obj.path, self.fname), val)
 
         def __init__(self):
             self.fname = self.__class__.__name__
@@ -179,7 +171,7 @@ class Context(object):
         makedirs(self.path)
 
         try:
-            os.symlink(sys.argv[0], self.subpath.rerun)
+            os.symlink(sys.argv[0], join(self.path, 'rerun'))
         except OSError:
             pass
 
