@@ -138,18 +138,6 @@ class Context(object):
         if retval is not None:
             return parse(retval)
 
-    @property_rw
-    def stdin(self, val=UNDEFINED):
-        return self._file_str(self.subpath.stdin, val)
-
-    @property_rw
-    def stdout(self, val=UNDEFINED):
-        return self._file_str(self.subpath.stdout, val)
-
-    @property_rw
-    def stderr(self, val=UNDEFINED):
-        return self._file_str(self.subpath.stderr, val)
-
     def save(self, input=None, command=None):
         makedirs(self.path)
 
@@ -176,6 +164,14 @@ class Context(object):
                     return "", str(e), None
 
             self.stdout, self.stderr, self.exitcode = run(command, input)
+
+for attr in ('stdin', 'stdout', 'stderr'):
+    def make_method(attr):
+        def method(self, val=UNDEFINED):
+            return self._file_str(getattr(self.subpath, attr), val)
+        method.__name__ = attr
+        return method
+    setattr(Context, attr, property_rw(make_method(attr)))
 
 def debug():
     args = sys.argv[1:]
