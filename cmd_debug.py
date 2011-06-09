@@ -166,14 +166,13 @@ class Context(object):
             self.stdout, self.stderr, self.exitcode = run(command, input)
 
 for attr in ('stdin', 'stdout', 'stderr'):
-    def make_method(attr):
-        def method(self, val=UNDEFINED):
-            return self._file_str(getattr(self.subpath, attr), val)
-        method.__name__ = attr
-        return method
+    def make_property(attr):
+        class RawString(Context.FileProperty):
+            pass
+        RawString.__name__ = attr
+        return RawString()
 
-    method = make_method(attr)
-    setattr(Context, attr, property(method, method))
+    setattr(Context, attr, make_property(attr))
 
 def debug():
     args = sys.argv[1:]
