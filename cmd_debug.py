@@ -19,6 +19,8 @@ import errno
 from StringIO import StringIO
 from subprocess import Popen, PIPE
 
+import shlex
+
 def makedirs(path):
     try:
         os.makedirs(path)
@@ -26,8 +28,13 @@ def makedirs(path):
         if e.errno != errno.EEXIST:
             raise
 
+class UNDEFINED:
+    pass
 
-class Context:
+def property_rw(func):
+    return property(func, func)
+
+class Context(object):
     class ContextPaths:
         SUBDIRS = ['command', 'id', 'env', 'stdin', 'stdout', 'stderr', 'exitcode', 'rerun']
         def __init__(self, path):
@@ -40,72 +47,135 @@ class Context:
         self.subpath = self.ContextPaths(path)
 
     @staticmethod
-    def fmt_command(argv):
-        if not argv:
-            return ""
+    def _file_str(path, s=UNDEFINED):
+        if s is UNDEFINED:
+            if not exists(path):
+                return None
 
-        args = argv[1:]
+            return file(path).read().rstrip()
 
-        for i, arg in enumerate(args):
-            if re.search(r"[\s'\"]", arg):
-                args[i] = commands.mkarg(arg)
+        else:
+            if s is None:
+                if exists(path):
+                    os.remove(path)
             else:
-                args[i] = " " + arg
+                fh = file(path, "w")
+                print >> fh, s
+                fh.close()
 
-        return argv[0] + "".join(args)
+    @property_rw
+    def id(self, val=UNDEFINED):
 
-    @staticmethod
-    def fmt_id():
-        id = "%d:%d:%s" % (os.getuid(), os.getgid(), 
-                           ",".join([ str(group) for group in os.getgroups() ]))
-        return id
+        def fmt(uid, gid, groups):
+            id = "%d:%d:%s" % (uid, gid, ",".join([ str(group) 
+                                                    for group in groups ]))
+            return id
 
-    @staticmethod
-    def fmt_env():
-        sio = StringIO()
-        for var, val in os.environ.items():
-            print >> sio, "%s=%s" % (var, val)
+        def parse(s):
+            uid, gid, groups = s.split(':')
+            groups = [ int(group) for group in groups.split(',') ]
+            return int(uid), int(gid), groups
 
-        return sio.getvalue()
+        if val and val is not UNDEFINED:
+            uid, gid, groups = val
+            val = fmt(uid, gid, groups)
 
-    @staticmethod
-    def run(command, input=None):
-        try:
-            child = Popen(command, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-            stdout, stderr = child.communicate(input)
+        retval = self._file_str(self.subpath.id, val)
+        if retval:
+            return parse(retval)
 
-            return stdout, stderr, child.returncode
+    @property_rw
+    def env(self, val=UNDEFINED):
+        def fmt(env):
+            sio = StringIO()
+            for var, val in env.items():
+                print >> sio, "%s=%s" % (var, val)
 
-        except OSError, e:
-            return "", str(e), None
+            return sio.getvalue()
+
+        def parse(s):
+            return dict([ line.split('=', 1) for line in s.splitlines() ])
+
+        if val and val is not UNDEFINED:
+            val = fmt(val)
+
+        retval = self._file_str(self.subpath.env, val)
+        if retval:
+            return parse(retval)
+
+    @property_rw
+    def exitcode(self, val=UNDEFINED):
+        if val and val is not UNDEFINED:
+            val = str(val)
+
+        retval = self._file_str(self.subpath.exitcode, val)
+        if retval is not None:
+            return int(retval)
+
+    @property_rw
+    def command(self, val=UNDEFINED):
+        def fmt(argv):
+            if not argv:
+                return ""
+
+            args = argv[1:]
+
+            for i, arg in enumerate(args):
+                if re.search(r"[\s'\"]", arg):
+                    args[i] = commands.mkarg(arg)
+                else:
+                    args[i] = " " + arg
+
+            return argv[0] + "".join(args)
+
+        def parse(s):
+            return shlex.split(s)
+
+        if val and val is not UNDEFINED:
+            val = fmt(val)
+
+        retval = self._file_str(self.subpath.command, val)
+        if retval is not None:
+            return parse(retval)
+
+    @property_rw
+    def stdin(self, val=UNDEFINED):
+        return self._file_str(self.subpath.stdin, val)
+
+    @property_rw
+    def stdout(self, val=UNDEFINED):
+        return self._file_str(self.subpath.stdout, val)
+
+    @property_rw
+    def stderr(self, val=UNDEFINED):
+        return self._file_str(self.subpath.stderr, val)
 
     def save(self, input=None, command=None):
         makedirs(self.path)
-        subpath = self.subpath
-
-        print >> file(subpath.id, "w"), self.fmt_id()
-        print >> file(subpath.env, "w").write(self.fmt_env())
-
-        if input:
-            file(subpath.stdin, "w").write(input)
 
         try:
-            os.symlink(sys.argv[0], subpath.rerun)
+            os.symlink(sys.argv[0], self.subpath.rerun)
         except OSError:
             pass
 
+        self.id = (os.getuid(), os.getgid(), os.getgroups())
+        self.env = os.environ
+
+        self.stdin = input
         if command:
-            print >> file(subpath.command, "w"), self.fmt_command(command)
+            self.command = command
 
-            stdout, stderr, exitcode = run(command, input)
-            if stdout:
-                file(subpath.stdout, "w").write(stdout)
+            def run(command, input=None):
+                try:
+                    child = Popen(command, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+                    stdout, stderr = child.communicate(input)
 
-            if stderr:
-                file(subpath.stderr, "w").write(stderr)
+                    return stdout, stderr, child.returncode
 
-            if exitcode is not None:
-                print >> file(subpath.exitcode, "w"), "%d" % exitcode
+                except OSError, e:
+                    return "", str(e), None
+
+            self.stdout, self.stderr, self.exitcode = run(command, input)
 
 def debug():
     args = sys.argv[1:]
