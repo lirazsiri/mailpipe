@@ -6,6 +6,19 @@ Environment variables:
 
     MAILPIPE_TMPDIR     Path where we save debug data
                         Default: /tmp/mailpipe-debug
+
+Example usage:
+
+    # capture execution context
+    cat > $HOME/.forward << 'EOF'
+    "| mailpipe-debug"
+    EOF
+
+    # wraps around command transparently
+    cat > $HOME/.forward << 'EOF'
+    "| mailpipe-debug mailpipe-reply --mail-error post_comment.php"
+    EOF
+
 """
 import sys
 import os
@@ -192,9 +205,10 @@ class Context(object):
         os.setgid(gid)
         os.setuid(uid)
 
-        if shell:
+        if shell or not self.command:
             shell = os.environ.get("SHELL", "/bin/bash")
-            print "# cat stdin | " + " ".join(self.command)
+            if command:
+                print "# cat stdin | " + " ".join(self.command)
             exitcode = Popen(shell, env=self.env).wait()
         else:
             child = Popen(self.command, env=self.env, stdin=PIPE)
