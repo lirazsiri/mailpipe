@@ -138,6 +138,25 @@ class Context(object):
             return int(s)
     exitcode = exitcode()
 
+    class RawString(FileProperty):
+        @staticmethod
+        def serialize(s):
+            if not s:
+                return None
+            return s
+
+    class stdin(RawString):
+        pass
+    stdin = stdin()
+
+    class stdout(RawString):
+        pass
+    stdout = stdout()
+
+    class stderr(RawString):
+        pass
+    stderr = stderr()
+
     def save(self, input=None, command=None):
         makedirs(self.path)
 
@@ -164,20 +183,6 @@ class Context(object):
                     return "", str(e), None
 
             self.stdout, self.stderr, self.exitcode = run(command, input)
-
-for attr in ('stdin', 'stdout', 'stderr'):
-    def make_property(attr):
-        class RawString(Context.FileProperty):
-            @staticmethod
-            def serialize(s):
-                if not s:
-                    return None
-                return s
-
-        RawString.__name__ = attr
-        return RawString()
-
-    setattr(Context, attr, make_property(attr))
 
 def debug():
     args = sys.argv[1:]
