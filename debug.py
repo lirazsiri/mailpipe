@@ -31,6 +31,7 @@ import errno
 
 from StringIO import StringIO
 from subprocess import Popen, PIPE
+import commands
 
 import shlex
 
@@ -211,8 +212,12 @@ class Context(object):
 
         if shell or not self.command:
             shell = os.environ.get("SHELL", "/bin/bash")
-            if command:
-                print "# cat stdin | " + " ".join(self.command)
+            print "ID: %s" % commands.getoutput("id")
+            print "SHELL: %s" % shell
+
+            if self.command:
+                print "COMMAND: cat stdin | " + " ".join(self.command)
+
             exitcode = Popen(shell, env=self.env).wait()
         else:
             child = Popen(self.command, env=self.env, stdin=PIPE)
