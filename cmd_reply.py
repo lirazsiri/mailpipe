@@ -225,6 +225,9 @@ def sendmail(sender, recipient, subject, body):
     email['To'] = recipient
     email['Subject'] = subject
 
+    if os.system("which sendmail > /dev/null") != 0:
+        os.environ['PATH'] += ':/usr/local/sbin:/usr/sbin'
+
     Popen("sendmail -t", shell=True, stdin=PIPE).communicate(str(email))
 
 class AuthSender:
