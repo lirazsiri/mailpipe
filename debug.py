@@ -127,15 +127,29 @@ class Context(object):
     class env(FileProperty):
         @staticmethod
         def serialize(env):
+            def quote(s):
+                return s.replace("\\", "\\\\").replace("\n", "\\n")
+
             sio = StringIO()
             for var, val in env.items():
-                print >> sio, "%s=%s" % (var, val)
+                print >> sio, "%s=%s" % (var, quote(val))
 
             return sio.getvalue()
 
         @staticmethod
         def unserialize(s):
-            return dict([ line.split('=', 1) for line in s.splitlines() ])
+            def unquote(s):
+                return re.sub(r'\\(.)', lambda m: ('\n' 
+                                                   if m.group(1) == 'n' 
+                                                   else m.group(1)), s)
+
+            d = {}
+            for line in s.splitlines():
+                key, val = line.split('=', 1)
+                d[key] = unquote(val)
+
+            return d
+
     env = env()
 
     class exitcode(FileProperty):
