@@ -18,7 +18,7 @@ Options:
     --auth-sender=SECRET | PATH        Authenticate sender with secret
                                        Accepts a string value or a file path
 
-Action API:
+Action command interface:
     
     (echo title; cat body) | action action_path urlencode(sender_email)
 
@@ -127,7 +127,7 @@ def usage(e=None):
     if e:
         print >> sys.stderr, "error: " + str(e)
 
-    print >> sys.stderr, "Usage: cat mail.eml | %s [-options]" % sys.argv[0]
+    print >> sys.stderr, "Usage: cat mail.eml | %s [-options] action-command" % sys.argv[0]
     tpl = string.Template(__doc__.strip()).substitute(DEFAULT_QUOTED_FIRSTLINE_RE=DEFAULT_QUOTED_FIRSTLINE_RE, 
                                                       DEFAULT_QUOTED_ACTIONTOKEN_RE=DEFAULT_QUOTED_ACTIONTOKEN_RE)
     print >> sys.stderr, tpl
