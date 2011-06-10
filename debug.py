@@ -4,8 +4,22 @@ Mailpipe debug tool traps input/output for inspection
 
 Environment variables:
 
-    MAILPIPE_TMPDIR     Path where we save debug data
-                        Default: /tmp/mailpipe-debug
+    MAILPIPE_TMPDIR         Path where we save debug data
+                            Default: /tmp/mailpipe-debug
+
+Context data:
+    $MAILPIPE_TMPDIR/<id>/  Per-run location where context is saved
+        rerun               Symlink to executable that reruns context
+
+        id                  <uid>:<gid>:<groups>
+        env                 Serialized environment
+
+        command             Command executed through mailpipe-debug
+        exitcode            Exitcode of executed command
+
+        stdin               Input data passed though mailpipe
+        stdout              Saved output from the executed command
+        stderr              Saved error output from the executed command
 
 Example usage:
 
@@ -222,7 +236,7 @@ class Context(object):
             print "SHELL: %s" % shell
 
             if self.command:
-                print "COMMAND: cat stdin | " + " ".join(self.command)
+                print "COMMAND: cat input | " + " ".join(self.command)
 
             exitcode = Popen(shell, env=self.env).wait()
         else:
