@@ -21,6 +21,22 @@ Action API:
     
     (echo title; cat body) | action action_path urlencode(sender_email)
 
+Example setup:
+
+    useradd reply-handler
+    su --login reply-handler
+
+    mkdir bin
+    ln -s /usr/share/mailpipe/contrib/drupal_post_comment.php bin/post_comment
+
+    echo mysecretpassword > secret
+    chmod 600 secret
+
+    # setup mail forward rule (works with postfix)
+    cat > $HOME/.forward << 'EOF'
+    "| PATH=$HOME/bin:$PATH mailpipe-reply --auth-sender=$HOME/secret --mail-error post_comment"
+    EOF
+
 """
 import os
 from os.path import *
