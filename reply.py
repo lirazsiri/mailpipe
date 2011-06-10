@@ -50,10 +50,8 @@ import string
 
 from commands import mkarg
 from popen2 import Popen4
-from subprocess import Popen, PIPE
 
 import email
-from email.mime.text import MIMEText
 
 import sha
 
@@ -61,24 +59,14 @@ from StringIO import StringIO
 import traceback
 
 import urllib
+from filter import FilterCommand
+from sendmail import sendmail
 
 DEFAULT_QUOTED_FIRSTLINE_RE = r'\| '
 DEFAULT_QUOTED_ACTIONTOKEN_RE = r'https?://\S*?/([_\w\d\#\/\-]+)\s'
 
 class Error(Exception):
     pass
-
-class FilterCommand:
-    def __init__(self, command):
-        self.command = command
-
-    def __call__(self, s):
-        child = Popen(self.command, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-        (stdout, stderr) = child.communicate(s)
-        if child.returncode != 0:
-            raise Error("Error from filter: %s\n%s" % (self.command, stderr))
-
-        return stdout
 
 def get_sender_address(msg):
     sender_address = msg['from']
@@ -133,17 +121,6 @@ def usage(e=None):
     print >> sys.stderr, tpl
 
     sys.exit(1)
-
-def sendmail(sender, recipient, subject, body):
-    email = MIMEText(body)
-    email['From'] = sender
-    email['To'] = recipient
-    email['Subject'] = subject
-
-    if os.system("which sendmail > /dev/null") != 0:
-        os.environ['PATH'] += ':/usr/local/sbin:/usr/sbin'
-
-    Popen("sendmail -t", shell=True, stdin=PIPE).communicate(str(email))
 
 class AuthSender:
     def __init__(self, secret):

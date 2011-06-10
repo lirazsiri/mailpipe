@@ -11,7 +11,10 @@ if [ -n "$3" ]; then
 fi
 
 echo sender=$1
-echo action_token=$2
+if [ -n "$2" ]; then
+    echo action_token=$2
+fi
+echo
 
 read TITLE
 echo TITLE=$TITLE
