@@ -1,6 +1,6 @@
 #!/usr/bin/python
 """
-Mailpipe debug tool traps input/output for inspection
+Mailpipe debug tool traps execution context for inspection
 
 Environment variables:
 
@@ -30,7 +30,7 @@ Example usage:
 
     # wraps around command transparently
     cat > $HOME/.forward << 'EOF'
-    "| mailpipe-debug mailpipe-reply --mail-error post_comment.php"
+    "| PATH=$HOME/bin:$PATH mailpipe-reply --mail-error post_comment.php"
     EOF
 
 """
