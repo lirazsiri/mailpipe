@@ -20,7 +20,7 @@ Options:
 
 Action command interface:
     
-    (echo title; cat body) | action action_path urlencode(sender_email)
+    (echo title; cat body) | action urlencode(sender_email) action_token
 
 Example setup:
 
@@ -229,7 +229,8 @@ def main():
         if bodyfilter:
             reply = FilterCommand(bodyfilter)(reply)
 
-        command = action_command + " %s %s" % (mkarg(action_token), mkarg(urllib.quote(msg['from'])))
+        command = action_command + " %s %s" % (mkarg(urllib.quote(msg['from'])),
+                                               mkarg(action_token))
         if opt_debug:
             print "COMMAND: " + command
             print "TITLE: " + title

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-if [[ $# < 2 ]]; then
-    echo "Usage: (echo title; cat body) | $0 action_token sender [ error ]"
+if [[ $# < 1 ]]; then
+    echo "Usage: (echo title; cat body) | $0 sender [ action_token ] [ error ]"
     exit 1
 fi
 
@@ -10,8 +10,8 @@ if [ -n "$3" ]; then
     exit 1
 fi
 
-echo action_token=$1
-echo sender=$2
+echo sender=$1
+echo action_token=$2
 
 read TITLE
 echo TITLE=$TITLE

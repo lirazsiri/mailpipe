@@ -66,8 +66,8 @@ function main($args) {
 		exit(1);
 	}
 
-	$url = $args[1];
-    $user_mail = urldecode($args[2]);
+    $user_mail = urldecode($args[1]);
+	$url = $args[2];
 
 	/* get comment from stdin */
 	$fh = fopen("php://stdin", "r");
