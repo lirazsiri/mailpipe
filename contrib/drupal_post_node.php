@@ -40,21 +40,23 @@ function post_node($type, $user_mail, $subject, $body) {
     $form_state['values']['name'] = $user->name;
     $form_state['values']['title'] = $subject;
     $form_state['values']['body'] = $body;
-    $form_state['values']['publish_on'] = 0;
+    $form_state['values']['publish_on'] =  0;
 
     $form_state['values']['op'] = t('Save');
-    drupal_execute("$type_node_form", $form_state, (object)$node);
+    drupal_execute("{$type}_node_form", $form_state, (object)$node);
+    $user = $orig_user;
 
     $nid = $form_state['nid'];
+    if(!$nid)
+        throw new Exception("post node failure");
 
-    $user = $orig_user;
     return url("node/$nid", array('absolute' => TRUE));
 }
 
 function main($args) {
 
 	if(count($args) != 3) {
-		print "Syntax: {$args[0]} type user@mail.address\n\n";
+		print "Syntax: {$args[0]} content-type user@mail.address\n\n";
 		print "Example usage:\n\n";
 		print "    (echo 'comment title'; cat comment_body.txt) | {$args[0]} blog liraz@turnkeylinux.org\n";
 
@@ -73,14 +75,25 @@ function main($args) {
     try {
         $url = post_node($type, $user_mail, $subject, $body);
         print "$url\n";
+
+        $messages = drupal_get_messages();
+        foreach ($messages['status'] as $message) {
+            $message = strip_tags($message);
+            print "\n$message\n";
+        }
     } catch(Exception $e) {
-        print "error: {$e->getMessage()}\n";
+        print "Error: {$e->getMessage()}\n";
+
+        $messages = drupal_get_messages();
+        foreach ($messages['error'] as $message) {
+            $message = strip_tags($message);
+            print "\n    $message\n";
+        }
+
         exit(1);
     }
 
 	return 0;
 }
-
-
 
 ?>
