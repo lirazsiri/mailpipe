@@ -5,7 +5,7 @@ to an automatic notification from a website (for example).
 
 Options:
     --debug                            Debug mail parsing
-    --mail-error                       Mail action errors back to sender
+    --mailback-error                   Mail action errors back to sender
     --bodyfilter filter-command        Pass body through filter-command
                                        (triggers error if exitcode != 0)
 
@@ -35,7 +35,7 @@ Example setup:
 
     # setup mail forward rule (works with postfix)
     cat > $$HOME/.forward << 'EOF'
-    "| PATH=$$HOME/bin:$$PATH mailpipe-reply --auth-sender=$$HOME/secret --mail-error post_comment"
+    "| PATH=$$HOME/bin:$$PATH mailpipe-reply --auth-sender=$$HOME/secret --mailback-error post_comment"
     EOF
 
 """
@@ -138,7 +138,7 @@ class AuthSender:
 
 def main():
     opt_debug = False
-    opt_mailerror = False
+    opt_mailback_error = False
     opt_quoted_firstline_re = DEFAULT_QUOTED_FIRSTLINE_RE
     opt_quoted_actiontoken_re = DEFAULT_QUOTED_ACTIONTOKEN_RE
 
@@ -151,7 +151,7 @@ def main():
                                          'quoted-firstline-re=',
                                          'quoted-actiontoken-re=',
                                          'bodyfilter=',
-                                         'mail-error',
+                                         'mailback-error',
                                          'debug'
                                        ])
                                        
@@ -173,8 +173,8 @@ def main():
         if opt == '--debug':
             opt_debug = True
 
-        if opt == '--mail-error':
-            opt_mailerror = True
+        if opt == '--mailback-error':
+            opt_mailback_error = True
 
         if opt == '--bodyfilter':
             bodyfilter = val
@@ -231,7 +231,7 @@ def main():
             print command_output,
 
     except Exception, e:
-        if not opt_mailerror:
+        if not opt_mailback_error:
             raise
 
         sio = StringIO()
