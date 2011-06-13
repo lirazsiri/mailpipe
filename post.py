@@ -4,7 +4,8 @@ Parse a mail post and pipe through to a command action.
 
 Options:
     --debug                            Debug mail parsing
-    --mail-error                       Mail action errors back to sender
+    --mailback-output                  Mail action output back to sender
+    --mailback-error                   Mail action errors back to sender
     --bodyfilter filter-command        Pass body through filter-command
                                        (triggers error if exitcode != 0)
 
@@ -49,7 +50,8 @@ def usage(e=None):
 
 def main():
     opt_debug = False
-    opt_mailerror = False
+    opt_mailback_error = False
+    opt_mailback_output = False
 
     bodyfilter = None
     auth_sender = None
@@ -57,7 +59,8 @@ def main():
     try:
         opts, args = getopt.gnu_getopt(sys.argv[1:], 'h', 
                                        [ 'bodyfilter=',
-                                         'mail-error',
+                                         'mailback-output',
+                                         'mailback-error',
                                          'debug'
                                        ])
                                        
@@ -79,8 +82,11 @@ def main():
         if opt == '--debug':
             opt_debug = True
 
-        if opt == '--mail-error':
-            opt_mailerror = True
+        if opt == '--mailback-error':
+            opt_mailback_error = True
+
+        if opt == '--mailback-output':
+            opt_mailback_output = True
 
         if opt == '--bodyfilter':
             bodyfilter = val
@@ -113,19 +119,22 @@ def main():
             raise Error("non-zero exitcode (%s) for command: %s\n\n%s" % 
                         (os.WEXITSTATUS(error), command, command_output))
 
-        if command_output:
-            print command_output,
-
     except Exception, e:
-        if not opt_mailerror:
+        if not opt_mailback_error:
             raise
 
         sio = StringIO()
         traceback.print_exc(file=sio)
 
         sendmail(msg['to'], msg['from'], 
-                 'Error handling post: ' + msg['subject'],
-                 sio.getvalue())
+                 'Error handling post: ' + msg['subject'], sio.getvalue())
+
+    if opt_mailback_output:
+        sendmail(msg['to'], msg['from'], 
+                 'Re: ' + msg['subject'], command_output)
+                 
+    else:
+        print command_output,
 
 if __name__ == "__main__":
     main()
