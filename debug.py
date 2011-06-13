@@ -236,7 +236,7 @@ class Context(object):
             print "SHELL: %s" % shell
 
             if self.command:
-                print "COMMAND: cat input | " + " ".join(self.command)
+                print "COMMAND: cat stdin | " + " ".join(self.command)
 
             exitcode = Popen(shell, env=self.env).wait()
         else:
