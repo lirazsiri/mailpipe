@@ -59,6 +59,20 @@ def makedirs(path):
 class UNDEFINED:
     pass
 
+def fmt_command(argv):
+    if not argv:
+        return ""
+
+    args = argv[1:]
+
+    for i, arg in enumerate(args):
+        if re.search(r"[\s'\"]", arg):
+            args[i] = commands.mkarg(arg)
+        else:
+            args[i] = " " + arg
+
+    return argv[0] + "".join(args)
+
 class Context(object):
     def __init__(self, path):
         self.path = path
@@ -105,18 +119,7 @@ class Context(object):
     class command(FileProperty):
         @staticmethod
         def serialize(argv):
-            if not argv:
-                return ""
-
-            args = argv[1:]
-
-            for i, arg in enumerate(args):
-                if re.search(r"[\s'\"]", arg):
-                    args[i] = commands.mkarg(arg)
-                else:
-                    args[i] = " " + arg
-
-            return argv[0] + "".join(args)
+            return fmt_command(argv)
 
         @staticmethod
         def unserialize(s):
@@ -236,7 +239,7 @@ class Context(object):
             print "SHELL: %s" % shell
 
             if self.command:
-                print "COMMAND: cat stdin | " + " ".join(self.command)
+                print "COMMAND: cat stdin | " + fmt_command(self.command)
 
             exitcode = Popen(shell, env=self.env).wait()
         else:
