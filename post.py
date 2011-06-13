@@ -128,6 +128,8 @@ def main():
 
         sendmail(msg['to'], msg['from'], 
                  'Error handling post: ' + msg['subject'], sio.getvalue())
+        
+        sys.exit(1)
 
     if opt_mailback_output:
         sendmail(msg['to'], msg['from'], 

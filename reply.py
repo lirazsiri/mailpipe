@@ -227,9 +227,6 @@ def main():
             raise Error("non-zero exitcode (%s) for command: %s\n\n%s" % 
                         (os.WEXITSTATUS(error), command, command_output))
 
-        if command_output:
-            print command_output,
-
     except Exception, e:
         if not opt_mailback_error:
             raise
@@ -240,6 +237,11 @@ def main():
         sendmail(msg['to'], msg['from'], 
                  'Error handling reply: ' + msg['subject'],
                  sio.getvalue())
+
+        sys.exit(1)
+
+    if command_output:
+        print command_output,
 
 if __name__ == "__main__":
     main()
