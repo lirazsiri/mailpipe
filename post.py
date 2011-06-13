@@ -3,7 +3,6 @@
 Parse a mail post and pipe through to a command action.
 
 Options:
-    --debug                            Debug mail parsing
     --mailback-output                  Mail action output back to sender
     --mailback-error                   Mail action errors back to sender
     --bodyfilter filter-command        Pass body through filter-command
@@ -36,9 +35,6 @@ import urllib
 from filter import FilterCommand
 from sendmail import sendmail
 
-class Error(Exception):
-    pass
-
 def usage(e=None):
     if e:
         print >> sys.stderr, "error: " + str(e)
@@ -48,8 +44,37 @@ def usage(e=None):
 
     sys.exit(1)
 
+class Error(Exception):
+    pass
+
+class MailHandler:
+    def __init__(self, action_command, bodyfilter=None):
+        self.action_command = action_command
+        self.bodyfilter = bodyfilter
+
+    def __call__(self, msg):
+        title = msg['subject']
+        body = msg.get_payload()
+
+        if self.bodyfilter:
+            body = FilterCommand(self.bodyfilter)(body)
+
+        command = self.action_command + " %s" % mkarg(urllib.quote(msg['from']))
+        child = Popen4(command)
+        print >> child.tochild, title
+        print >> child.tochild, body
+        child.tochild.close()
+
+        command_output = child.fromchild.read()
+        error = child.wait()
+
+        if error != 0:
+            raise Error("non-zero exitcode (%s) for command: %s\n\n%s" % 
+                        (os.WEXITSTATUS(error), command, command_output))
+
+        return command_output
+
 def main():
-    opt_debug = False
     opt_mailback_error = False
     opt_mailback_output = False
 
@@ -61,7 +86,6 @@ def main():
                                        [ 'bodyfilter=',
                                          'mailback-output',
                                          'mailback-error',
-                                         'debug'
                                        ])
                                        
     except getopt.GetoptError, e:
@@ -79,9 +103,6 @@ def main():
         if opt == '-h':
             usage()
 
-        if opt == '--debug':
-            opt_debug = True
-
         if opt == '--mailback-error':
             opt_mailback_error = True
 
@@ -92,33 +113,10 @@ def main():
             bodyfilter = val
 
     msg = email.message_from_string(sys.stdin.read())
-    title = msg['subject']
-    body = msg.get_payload()
+    handler = MailHandler(action_command, bodyfilter)
 
     try:
-        if bodyfilter:
-            body = FilterCommand(bodyfilter)(body)
-
-        command = action_command + " %s" % mkarg(urllib.quote(msg['from']))
-        if opt_debug:
-            print "COMMAND: " + command
-            print "TITLE: " + title
-            print
-            print body,
-            return
-
-        child = Popen4(command)
-        print >> child.tochild, title
-        print >> child.tochild, body
-        child.tochild.close()
-
-        command_output = child.fromchild.read()
-        error = child.wait()
-
-        if error != 0:
-            raise Error("non-zero exitcode (%s) for command: %s\n\n%s" % 
-                        (os.WEXITSTATUS(error), command, command_output))
-
+        output = handler(msg)
     except Exception, e:
         if not opt_mailback_error:
             raise
@@ -133,10 +131,10 @@ def main():
 
     if opt_mailback_output:
         sendmail(msg['to'], msg['from'], 
-                 'Re: ' + msg['subject'], command_output)
+                 'Re: ' + msg['subject'], output)
                  
     else:
-        print command_output,
+        print output,
 
 if __name__ == "__main__":
     main()
