@@ -4,7 +4,6 @@ Invoke an action from a parsed mail reply. Useful for handling a reply
 to an automatic notification from a website (for example).
 
 Options:
-    --debug                            Debug mail parsing
     --mailback-error                   Mail action errors back to sender
     --bodyfilter filter-command        Pass body through filter-command
                                        (triggers error if exitcode != 0)
@@ -173,7 +172,6 @@ def usage(e=None):
     sys.exit(1)
 
 def main():
-    opt_debug = False
     opt_mailback_error = False
     opt_quoted_firstline_re = None
     opt_quoted_actiontoken_re = None
@@ -187,8 +185,7 @@ def main():
                                          'quoted-firstline-re=',
                                          'quoted-actiontoken-re=',
                                          'bodyfilter=',
-                                         'mailback-error',
-                                         'debug'
+                                         'mailback-error'
                                        ])
                                        
     except getopt.GetoptError, e:
@@ -205,9 +202,6 @@ def main():
     for opt, val in opts:
         if opt == '-h':
             usage()
-
-        if opt == '--debug':
-            opt_debug = True
 
         if opt == '--mailback-error':
             opt_mailback_error = True
