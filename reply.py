@@ -48,85 +48,39 @@ import getopt
 import re
 import string
 
-from commands import mkarg
-from popen2 import Popen4
-
 import email
-
-import sha
 
 from StringIO import StringIO
 import traceback
 
-import urllib
-from filter import FilterCommand
 from sendmail import sendmail
 
-DEFAULT_QUOTED_FIRSTLINE_RE = r'\| '
-DEFAULT_QUOTED_ACTIONTOKEN_RE = r'https?://\S*?/([_\w\d\#\/\-]+)\s'
+import sha
+import urllib
+from commands import mkarg
+from action import Action
 
 class Error(Exception):
     pass
-
-def get_sender_address(msg):
-    sender_address = msg['from']
-    m = re.search(r'<(.*)>', sender_address)
-    if m:
-        sender_address = m.group(1)
-
-    def filter_legal(s):
-        return re.sub(r'[^\w\d\.\-@+_]', '', s)
-
-    return filter_legal(sender_address)
-
-def get_title(title):
-    m = re.match(r'^(.*?)(?:[\s\(])?\bRe:', title, re.IGNORECASE | re.DOTALL)
-    if m:
-        title = m.group(1).strip()
-
-    return title
-    
-def split_body(body, quoted_firstline_re):
-    """split body into reply and original quoted text"""
-    def find_line(lines, pattern):
-        pattern = re.compile(pattern)
-        for i, line in enumerate(lines):
-            if pattern.match(line):
-                return i
-
-    lines = body.splitlines()
-
-    linenum = find_line(lines, '^.\s*' + quoted_firstline_re)
-    if linenum < 0:
-        raise Error("can't match quoted firstline /%s/" % quoted_firstline_re)
-
-    def rejoin(lines):
-        return "\n".join(lines).strip()
-    return rejoin(lines[:linenum-1]), rejoin(lines[linenum-1:])
-
-def get_action_token(quoted, quoted_actiontoken_re):
-    m = re.search(quoted_actiontoken_re, quoted) 
-    if not m:
-        raise Error("couldn't match regexp for quoted action token /%s/" % quoted_actiontoken_re)
-
-    return m.group(1)
-
-def usage(e=None):
-    if e:
-        print >> sys.stderr, "error: " + str(e)
-
-    print >> sys.stderr, "Usage: cat mail.eml | %s [-options] action-command" % sys.argv[0]
-    tpl = string.Template(__doc__.strip()).substitute(DEFAULT_QUOTED_FIRSTLINE_RE=DEFAULT_QUOTED_FIRSTLINE_RE, 
-                                                      DEFAULT_QUOTED_ACTIONTOKEN_RE=DEFAULT_QUOTED_ACTIONTOKEN_RE)
-    print >> sys.stderr, tpl
-
-    sys.exit(1)
 
 class AuthSender:
     def __init__(self, secret):
         self.secret = secret
 
-    def __call__(self, msg, sender_address, action_token):
+    @staticmethod
+    def get_sender_address(sender_address):
+        m = re.search(r'<(.*)>', sender_address)
+        if m:
+            sender_address = m.group(1)
+
+        def filter_legal(s):
+            return re.sub(r'[^\w\d\.\-@+_]', '', s)
+
+        return filter_legal(sender_address)
+
+    def __call__(self, msg, action_token):
+        sender_address = self.get_sender_address(msg['from'])
+
         m = re.search(r'\((.*?)\)', msg['to'])
         if not m:
             raise Error("expected auth token in the email's To: field")
@@ -136,11 +90,93 @@ class AuthSender:
         if tok1 != tok2:
             raise Error("invalid authentication token in To field (%s)" % tok1)
 
+class ReplyAction(Action):
+    DEFAULT_QUOTED_FIRSTLINE_RE = r'\| '
+    DEFAULT_QUOTED_ACTIONTOKEN_RE = r'https?://\S*?/([_\w\d\#\/\-]+)\s'
+
+    def __init__(self, action_command, bodyfilter=None, auth_sender=None,
+                 quoted_firstline_re=None, quoted_actiontoken_re=None):
+
+        Action.__init__(self, action_command, bodyfilter)
+
+        if quoted_firstline_re is None:
+            quoted_firstline_re = self.DEFAULT_QUOTED_FIRSTLINE_RE
+
+        if quoted_actiontoken_re is None:
+            quoted_actiontoken_re = self.DEFAULT_QUOTED_ACTIONTOKEN_RE
+
+        self.quoted_firstline_re = quoted_firstline_re
+        self.quoted_actiontoken_re = quoted_actiontoken_re
+
+        self.auth_sender = auth_sender
+
+    @staticmethod
+    def get_title(title):
+        m = re.match(r'^(.*?)(?:[\s\(])?\bRe:', title, re.IGNORECASE | re.DOTALL)
+        if m:
+            title = m.group(1).strip()
+
+        return title
+        
+    @staticmethod
+    def split_body(body, quoted_firstline_re):
+        """split body into reply and original quoted text"""
+        def find_line(lines, pattern):
+            pattern = re.compile(pattern)
+            for i, line in enumerate(lines):
+                if pattern.match(line):
+                    return i
+
+        lines = body.splitlines()
+
+        linenum = find_line(lines, '^.\s*' + quoted_firstline_re)
+        if linenum < 0:
+            raise Error("can't match quoted firstline /%s/" % quoted_firstline_re)
+
+        def rejoin(lines):
+            return "\n".join(lines).strip()
+        return rejoin(lines[:linenum-1]), rejoin(lines[linenum-1:])
+
+    @staticmethod
+    def get_action_token(quoted, quoted_actiontoken_re):
+        m = re.search(quoted_actiontoken_re, quoted) 
+        if not m:
+            raise Error("couldn't match regexp for quoted action token /%s/" % quoted_actiontoken_re)
+
+        return m.group(1)
+
+    def parse_msg(self, msg):
+        title = self.get_title(msg['subject'])
+        reply, quoted = self.split_body(msg.get_payload(), self.quoted_firstline_re)
+        action_token = self.get_action_token(quoted, self.quoted_actiontoken_re)
+
+        if self.auth_sender:
+            self.auth_sender(msg, action_token)
+
+        return title, reply, action_token
+
+    def command(self, msg, action_token):
+        return self.action_command + " %s %s" % (mkarg(urllib.quote(msg['from'])),
+                                                 mkarg(action_token))
+
+
+
+def usage(e=None):
+    if e:
+        print >> sys.stderr, "error: " + str(e)
+
+    print >> sys.stderr, "Usage: cat mail.eml | %s [-options] action-command" % sys.argv[0]
+    tpl = string.Template(__doc__.strip()).substitute(DEFAULT_QUOTED_FIRSTLINE_RE=ReplyAction.DEFAULT_QUOTED_FIRSTLINE_RE, 
+                                                      DEFAULT_QUOTED_ACTIONTOKEN_RE=ReplyAction.DEFAULT_QUOTED_ACTIONTOKEN_RE)
+    print >> sys.stderr, tpl
+
+    sys.exit(1)
+
 def main():
     opt_debug = False
     opt_mailback_error = False
-    opt_quoted_firstline_re = DEFAULT_QUOTED_FIRSTLINE_RE
-    opt_quoted_actiontoken_re = DEFAULT_QUOTED_ACTIONTOKEN_RE
+    opt_quoted_firstline_re = None
+    opt_quoted_actiontoken_re = None
 
     bodyfilter = None
     auth_sender = None
@@ -192,41 +228,11 @@ def main():
             auth_sender = AuthSender(val)
 
     msg = email.message_from_string(sys.stdin.read())
-    sender_address = get_sender_address(msg)
 
-    title = get_title(msg['subject'])
-
+    action = ReplyAction(action_command, bodyfilter, auth_sender,
+                         opt_quoted_firstline_re, opt_quoted_actiontoken_re)
     try:
-        reply, quoted = split_body(msg.get_payload(), opt_quoted_firstline_re)
-        action_token = get_action_token(quoted, opt_quoted_actiontoken_re)
-
-        if auth_sender:
-            auth_sender(msg, sender_address, action_token)
-
-        if bodyfilter:
-            reply = FilterCommand(bodyfilter)(reply)
-
-        command = action_command + " %s %s" % (mkarg(urllib.quote(msg['from'])),
-                                               mkarg(action_token))
-        if opt_debug:
-            print "COMMAND: " + command
-            print "TITLE: " + title
-            print
-            print reply
-            return
-
-        child = Popen4(command)
-        print >> child.tochild, title
-        print >> child.tochild, reply
-        child.tochild.close()
-
-        command_output = child.fromchild.read()
-        error = child.wait()
-
-        if error != 0:
-            raise Error("non-zero exitcode (%s) for command: %s\n\n%s" % 
-                        (os.WEXITSTATUS(error), command, command_output))
-
+        output = action(msg)
     except Exception, e:
         if not opt_mailback_error:
             raise
@@ -240,8 +246,8 @@ def main():
 
         sys.exit(1)
 
-    if command_output:
-        print command_output,
+    if output:
+        print output,
 
 if __name__ == "__main__":
     main()
