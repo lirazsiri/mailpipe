@@ -9,4 +9,4 @@ Package: mailpipe
 Architecture: all
 Depends: python (>= 2.4)
 Section: misc
-Description: Example
+Description: Toolkit for handling mail programmatically via Unix commands
