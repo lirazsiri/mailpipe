@@ -60,9 +60,9 @@ function post_comment($path, $user_mail, $subject, $comment) {
 function main($args) {
 
 	if(count($args) != 3) {
-		print "Syntax: {$args[0]} path[#comment-\$cid] urlencoded(user-mail)\n\n";
+		print "Syntax: {$args[0]} urlencoded(user-mail) path[#comment-\$cid] \n\n";
 		print "Example usage:\n\n";
-		print "    (echo 'comment title'; cat comment_body.txt) | {$args[0]} blog/great-post#comment-1234 2\n";
+		print "    (echo 'comment title'; cat comment_body.txt) | {$args[0]} liraz@turnkeylinux.org blog/great-post#comment-1234\n";
 		exit(1);
 	}
 
