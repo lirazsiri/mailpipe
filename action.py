@@ -8,13 +8,21 @@ from popen2 import Popen4
 class Error(Exception):
     pass
 
+def get_payload(msg):
+    payload = msg.get_payload()
+
+    if type(payload) in (list, tuple):
+        return get_payload(payload[0])
+    else:
+        return payload
+
 class Action:
     def __init__(self, action_command, bodyfilter=None):
         self.action_command = action_command
         self.bodyfilter = bodyfilter
 
     def parse_msg(self, msg):
-        return msg['subject'], msg.get_payload()
+        return msg['subject'], get_payload(msg)
 
     def command(self, msg):
         return self.action_command + " %s" % mkarg(urllib.quote(msg['from']))
