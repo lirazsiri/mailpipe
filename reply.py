@@ -57,7 +57,7 @@ from sendmail import sendmail
 import sha
 import urllib
 from commands import mkarg
-from action import Action
+from action import Action, get_body_text
 
 class Error(Exception):
     pass
@@ -146,7 +146,7 @@ class ReplyAction(Action):
 
     def parse_msg(self, msg):
         title = self.get_title(msg['subject'])
-        reply, quoted = self.split_body(msg.get_payload(), self.quoted_firstline_re)
+        reply, quoted = self.split_body(get_body_text(msg), self.quoted_firstline_re)
         action_token = self.get_action_token(quoted, self.quoted_actiontoken_re)
 
         if self.auth_sender:
