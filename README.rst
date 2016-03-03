@@ -7,6 +7,7 @@ mailpipe-post
 Parse a mail post and pipe through to a command action.
 
 Options::
+
     --mailback-output                  Mail action output back to sender
     --mailback-error                   Mail action errors back to sender
     --bodyfilter filter-command        Pass body through filter-command
